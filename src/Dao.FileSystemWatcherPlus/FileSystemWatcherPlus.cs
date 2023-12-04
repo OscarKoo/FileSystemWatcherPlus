@@ -69,17 +69,15 @@ namespace Dao.FileSystemWatcherPlus
 
         async Task Cather_Catch()
         {
-            var onWatching = OnWatching;
-            if (onWatching == null)
-                return;
-
             this.isWatching = true;
 
+            var onWatching = OnWatching;
             try
             {
                 while (this.queue.TryDequeue(out var arg))
                 {
-                    await onWatching(arg).ConfigureAwait(false);
+                    if (onWatching != null)
+                        await onWatching(arg).ConfigureAwait(false);
                 }
             }
             finally
@@ -108,14 +106,22 @@ namespace Dao.FileSystemWatcherPlus
 
         #endregion
 
+        #region Initialize
+
         void InitializeCatcher()
         {
+            if (this.cather != null)
+                return;
+
             this.cather = new Catcher();
             this.cather.Catch += Cather_Catch;
         }
 
         void InitializeWatcher(WatcherTypes enabledWatchers, string path, params string[] filters)
         {
+            if (this.watcher != null)
+                return;
+
             this.watcher = new FileSystemWatcher();
             if (!string.IsNullOrWhiteSpace(path))
                 Path = path;
@@ -141,6 +147,8 @@ namespace Dao.FileSystemWatcherPlus
             if (enabledWatchers.HasFlag(WatcherTypes.Renamed))
                 this.watcher.Renamed += Watcher_Renamed;
         }
+
+        #endregion
 
         void LoadExisted()
         {
@@ -201,55 +209,75 @@ namespace Dao.FileSystemWatcherPlus
             this.state = 2;
         }
 
-        void CheckDisposed()
-        {
-            if (this.state < 0)
-                throw new ObjectDisposedException(nameof(FileSystemWatcherPlus));
-        }
+        #region Dispose
 
         public void Dispose()
         {
             CheckDisposed();
 
             Stop();
-
-            if (this.watcher != null)
-            {
-                if (this.enabledWatchers.HasFlag(WatcherTypes.Created))
-                    this.watcher.Created -= Watcher_Modified;
-                if (this.enabledWatchers.HasFlag(WatcherTypes.Deleted))
-                    this.watcher.Deleted -= Watcher_Modified;
-                if (this.enabledWatchers.HasFlag(WatcherTypes.Changed))
-                    this.watcher.Changed -= Watcher_Modified;
-                if (this.enabledWatchers.HasFlag(WatcherTypes.Renamed))
-                    this.watcher.Renamed -= Watcher_Renamed;
-                this.watcher.Error -= Watcher_Error;
-                this.watcher.Dispose();
-                this.watcher = null;
-            }
-
-            if (this.cather != null)
-            {
-                this.cather.Catch -= Cather_Catch;
-                this.cather = null;
-            }
-
-            var sw = new SpinWait();
-            while (this.isWatching)
-            {
-                sw.SpinOnce();
-            }
-
-#if NETSTANDARD2_1_OR_GREATER
-            this.queue.Clear();
-#else
-            this.queue = new ConcurrentQueue<WatcherEventArgs>();
-#endif
+            DisposeWatcher();
+            DisposeCatcher();
+            WaitWatching();
+            DisposeQueue();
 
             OnWatching = null;
             OnException = null;
 
             this.state = -1;
         }
+
+        void CheckDisposed()
+        {
+            if (this.state < 0)
+                throw new ObjectDisposedException(nameof(FileSystemWatcherPlus));
+        }
+
+        void DisposeWatcher()
+        {
+            if (this.watcher == null)
+                return;
+
+            if (this.enabledWatchers.HasFlag(WatcherTypes.Created))
+                this.watcher.Created -= Watcher_Modified;
+            if (this.enabledWatchers.HasFlag(WatcherTypes.Deleted))
+                this.watcher.Deleted -= Watcher_Modified;
+            if (this.enabledWatchers.HasFlag(WatcherTypes.Changed))
+                this.watcher.Changed -= Watcher_Modified;
+            if (this.enabledWatchers.HasFlag(WatcherTypes.Renamed))
+                this.watcher.Renamed -= Watcher_Renamed;
+            this.watcher.Error -= Watcher_Error;
+            this.watcher.Dispose();
+            this.watcher = null;
+        }
+
+        void DisposeCatcher()
+        {
+            if (this.cather == null)
+                return;
+
+            this.cather.Catch -= Cather_Catch;
+            this.cather = null;
+        }
+
+        void WaitWatching()
+        {
+            var sw = new SpinWait();
+            while (this.isWatching)
+            {
+                sw.SpinOnce();
+            }
+        }
+
+        void DisposeQueue()
+        {
+#if NETSTANDARD2_1_OR_GREATER
+            this.queue.Clear();
+#else
+            this.queue = new ConcurrentQueue<WatcherEventArgs>();
+#endif
+        }
+
+        #endregion
     }
 }
