@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dao.QueueExecutor;
-#if NET5_0_OR_GREATER
+#if NETCOREAPP3_0_OR_GREATER
 using System.Collections.ObjectModel;
 #endif
 
@@ -47,7 +47,7 @@ namespace Dao.FileSystemWatcherPlus
             set => this.watcher.Filter = value;
         }
 
-#if NET5_0_OR_GREATER
+#if NETCOREAPP3_0_OR_GREATER
         public Collection<string> Filters => this.watcher.Filters;
 #endif
 
@@ -128,7 +128,7 @@ namespace Dao.FileSystemWatcherPlus
 
             if (filters != null && filters.Length > 0)
             {
-#if NET5_0_OR_GREATER
+#if NETCOREAPP3_0_OR_GREATER
                 foreach (var filter in filters)
                     Filters.Add(filter);
 #else
@@ -271,7 +271,7 @@ namespace Dao.FileSystemWatcherPlus
 
         void DisposeQueue()
         {
-#if NETSTANDARD2_1_OR_GREATER
+#if NETCOREAPP2_0_OR_GREATER || NETSTANDARD2_1_OR_GREATER
             this.queue.Clear();
 #else
             this.queue = new ConcurrentQueue<WatcherEventArgs>();
